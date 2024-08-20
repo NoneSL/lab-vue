@@ -13,7 +13,10 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@types/three": "^0.167.1",
+    "ammojs-typed": "^1.0.6",
     "pinia": "^2.1.7",
+    "three": "^0.167.1",
     "vue": "^3.4.29",
     "vue-router": "^4.3.3"
   },
