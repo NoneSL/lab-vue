@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ],
+  "allowSyntheticDefaultImports": true,
+  "esModuleInterop": true,
+  "compilerOptions": {
+    "typeRoots": ["node_modules/ammojs-typed/ammo/ambient", "types"]
+    // "typeRoots": []
+  }
+}
