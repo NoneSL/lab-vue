@@ -5,7 +5,14 @@ import * as Three from "three"
 import { nextTick, onMounted, ref } from 'vue';
 import { OrbitControls } from 'three/examples/jsm/Addons.js';
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js"
-// import { Static } from 'vue';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+// SMAA抗锯齿通道
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+// ShaderPass功能：使用后处理Shader创建后处理通道
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 // import Stats from 'three/addons/libs/stats.module.js';
 import Stats from "three/examples/jsm/libs/stats.module.js"
 defineOptions({
@@ -31,6 +38,10 @@ let light: Three.DirectionalLight;
 let scene: Three.Scene;
 let physicsList: Three.Mesh[] = [];
 let stats = new Stats();
+let renderer: Three.WebGLRenderer;
+let composer: EffectComposer;
+let obj3d66: Three.Mesh;
+let bloompass: UnrealBloomPass
 Ammo.bind(window)().then(api => {
     console.log("ammo init ready")
     AmmoApi = api;
@@ -123,19 +134,70 @@ const addObstacles = () => {
     physicsWorld.addRigidBody(physisc);
 }
 const loadModel = () => {
-    const loader = new FBXLoader();
-    loader.load('/public/model/three-axis-robot.FBX', (model) => {
-        console.log(model)
+    // const loader = new FBXLoader();
+    // loader.load('/public/model/three-axis-robot-bak.FBX', (model) => {
+    //     console.log(model)
 
-        scene.add(model.children[0])
+    //     scene.add(model)
+    //     ctrl.target.set(model.position.x, model.position.y, model.position.z)
+    // })
+    const loader = new GLTFLoader();
+    loader.load("/public/model/three-axis-robot.glb", (model) => {
+        model.scene.traverse((child) => {
+            const item = child as Three.Mesh;
+            const name = child.name;
+
+            if (name == 'Obj3d66-18592180-15-178') {
+                console.log(child)
+
+
+                obj3d66 = item;
+                if (obj3d66)
+                    obj3d66.material = new Three.MeshPhongMaterial({
+                        emissive: 0xff937a,
+                        emissiveIntensity: 50,
+                        color: 0xffffff,
+                        specular: 0xffffff,
+                        shininess: 1000,
+                        side: Three.DoubleSide,
+                        transparent: true,
+                    })
+                //添加闪烁动画
+                // item.material = new Three.Mater({
+                //     color: 0xff0000
+                // })
+                // child.material.color.setHex(0xff0000)
+            }
+            if (item.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        })
+        model.scene.scale.set(2, 2, 2)
+        model.scene.position.set(15, 0, 5)
+        scene.add(model.scene)
+
+
     })
+    // const compoer=new EffectComposer(renderer);
+    const renderpass = new RenderPass(scene, camera);
+    const bloompass = new UnrealBloomPass(new Three.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.01, 1);
+
+    composer = new EffectComposer(renderer);
+    composer.addPass(renderpass);
+    composer.addPass(bloompass);
+    composer.setPixelRatio(window.devicePixelRatio)
+    const pixelRatio = renderer.getPixelRatio(), width = window.innerWidth, height = window.innerHeight;
+    const smaaPass = new SMAAPass(width * pixelRatio, height * pixelRatio);
+    composer.addPass(smaaPass);
+    //设置材质颜色,红色 发光材质
 
 }
 const ThreeInit = () => {
     camera = new Three.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     scene = new Three.Scene();
     scene.background = new Three.Color(0xeeeeee);
-    const renderer = new Three.WebGLRenderer({ antialias: true });
+    renderer = new Three.WebGLRenderer({ antialias: true });
     const elem = canvas.value;
     renderer.render(scene, camera);
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -147,13 +209,13 @@ const ThreeInit = () => {
     camera.position.set(10, 10, 10);
 
     addMesh();
-    addObstacles();
+    // addObstacles();
     addLight(scene);
     createPlan();
     loadModel();
     const render = () => {
         // console.log("rendering")
-        renderer.render(scene, camera);
+        // renderer.render(scene, camera);
         light.shadow.camera.updateProjectionMatrix();
         physicsWorld.stepSimulation(clock.getDelta())
         // const objPhys = cube.userData.physicsBody;
@@ -181,7 +243,7 @@ const ThreeInit = () => {
                 const q = transformAux1.getRotation();
                 item.position.set(p.x(), p.y(), p.z());
                 item.quaternion.set(q.x(), q.y(), q.z(), q.w());
-                ctrl.target.set(item.position.x, item.position.y, item.position.z)
+                // ctrl.target.set(item.position.x, item.position.y, item.position.z)
 
             }
             //移动控制。
@@ -205,17 +267,20 @@ const ThreeInit = () => {
 
         })
         stats.update();
-
+        composer.render();
         ctrl.update();
+        const time = clock.getElapsedTime();
+        if (obj3d66) {
+            (obj3d66.material as any).emissive.set(0xff937a).multiplyScalar(Math.sin(time * 2) * 4 + 5);
+            // bloompass.strength = Math.sin(time * 2) * 1 + 3.3;
+        }
         // const pos = cube.position;
         // const transform1 = new AmmoApi.btTransform(new AmmoApi.btQuaternion(0, 0, 0, 0), new AmmoApi.btVector3(pos.x, pos.y, pos.z));
         // const btMotionState = new AmmoApi.btDefaultMotionState();
-
         // transformAux12.setRotation(new AmmoApi.btQuaternion(new AmmoApi.btVector3(0, 0, 0), 0));
         // btMotionState.setWorldTransform(transform1)
         // cube.userData.physicsBody.setMotionState(btMotionState);
         // console.log("text")
-
         renderer.setAnimationLoop(render);
 
     }
@@ -276,6 +341,9 @@ const addLight = (scene: Three.Scene) => {
     light.castShadow = true;
 
     scene.add(light);
+    // light
+    scene.add(new Three.HemisphereLight(0xffffff, 0x000000, 1))
+    scene.add(new Three.AmbientLight(0xffffff, 1))
 }
 const createPlan = () => {
     const heightFieldShape = new AmmoApi.btStaticPlaneShape(new AmmoApi.btVector3(0, 1, 0), 0);
@@ -292,7 +360,7 @@ const createPlan = () => {
     physicsWorld.addRigidBody(groundBody);
     transformAux1 = new AmmoApi.btTransform();
 
-    const groundMaterial = new Three.MeshBasicMaterial({ color: 0xC7C7C7 });
+    const groundMaterial = new Three.MeshBasicMaterial({ color: 0x6e6e6e });
     const terrain = new Three.Mesh(new Three.PlaneGeometry(1000, 1000), groundMaterial);
     const loader = new Three.TextureLoader();
 
@@ -309,6 +377,7 @@ const createPlan = () => {
     terrain.rotateX(-Math.PI / 2)
     scene.add(terrain);
 }
+
 const init = (api: typeof Ammo) => {
     const collisionConfiguration = new api.btDefaultCollisionConfiguration();
     const dispatcher = new api.btCollisionDispatcher(collisionConfiguration);
@@ -322,6 +391,31 @@ const init = (api: typeof Ammo) => {
 
 <template>
     <div ref="canvas"></div>
+    <!-- <div class="configure"> -->
+    <!-- <div style="opacity: 1;">
+            FUCKYOU
+        </div> -->
+    <!-- </div> -->
+
 </template>
 
-<style lang='scss' scoped></style>
+<style lang='scss' scoped>
+.configure {
+    // display: flex;
+    position: absolute;
+    // border: 1px solid red;
+    width: 500px;
+    height: 500px;
+    z-index: 111;
+    top: 0px;
+    right: 0px;
+    background-color: white;
+    // opacity: 0.3;
+    //毛玻璃
+    backdrop-filter: blur(10px);
+    //透明效果
+    opacity: 0.3;
+
+    // border-radius: 10px;
+}
+</style>
