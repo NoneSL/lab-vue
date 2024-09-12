@@ -26,6 +26,11 @@ const router = createRouter({
       path: '/terrain',
       name: 'terrain',
       component: () => import('../views/three/ammo/terrain.vue')
+    },
+    {
+      path: '/layout',
+      name: 'layout',
+      component: () => import('../views/layout/aio-machine.vue')
     }
   ]
 })
