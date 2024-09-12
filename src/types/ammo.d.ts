@@ -1,3 +1,6 @@
+declare module '/public/ammo/ammo.js';
+
+
 export default Ammo
 declare function Ammo<T>(target?: T): Promise<T & typeof Ammo>
 declare module Ammo {

@@ -1,6 +1,6 @@
 <script setup lang='ts'>
-defineOptions({
-    name: 'Three'
+    defineOptions({
+    name: 'ThreeView'
 })
 import { onMounted, ref } from 'vue';
 import { core } from './helper/core';
